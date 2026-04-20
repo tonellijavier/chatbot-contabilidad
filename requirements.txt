@@ -3,10 +3,10 @@ langchain-community
 langchain-groq
 langchain-classic
 langchain-text-splitters
-chromadb==0.4.24
+chromadb>=0.5.0
 pypdf
 python-dotenv
 sentence-transformers
 torch
 torchvision
-protobuf==3.20.3
+numpy>=1.26.0
