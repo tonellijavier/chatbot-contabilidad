@@ -26,7 +26,7 @@ load_dotenv()
 # ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
 
 # Cambiá esta contraseña por la que quieras darles a los autores
-PASSWORD = os.getenv("CHATBOT_PASSWORD", "contabilidad2024")
+PASSWORD = os.getenv("CHATBOT_PASSWORD")
 
 # ── CONFIGURACIÓN DE LA PÁGINA ─────────────────────────────────────────────────
 
