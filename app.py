@@ -6,6 +6,7 @@
 # "Contabilidad Básica" de Jorge Simaro y Omar Tonelli.
 #
 # Acceso protegido por contraseña.
+# Usa FAISS como base vectorial — liviano y compatible con Streamlit Cloud.
 #
 # PARA CORRERLO:
 #   streamlit run app.py
@@ -16,19 +17,14 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_classic.prompts import PromptTemplate
 from langchain_classic.chains import RetrievalQA
 
 load_dotenv()
 
-# ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
-
-# Cambiá esta contraseña por la que quieras darles a los autores
-PASSWORD = "contabilidad2024"
-
-# ── CONFIGURACIÓN DE LA PÁGINA ─────────────────────────────────────────────────
+PASSWORD = os.getenv("CHATBOT_PASSWORD")
 
 st.set_page_config(
     page_title="Contabilidad Básica — Asistente",
@@ -48,14 +44,8 @@ st.markdown("""
 # ── LOGIN ──────────────────────────────────────────────────────────────────────
 
 def mostrar_login():
-    """
-    Muestra la pantalla de login.
-    Si la contraseña es correcta, marca la sesión como autenticada.
-    st.session_state persiste el estado entre interacciones del usuario.
-    """
     st.markdown('<div class="titulo">📊 Contabilidad Básica</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitulo">Asistente del libro de Simaro y Tonelli</div>', unsafe_allow_html=True)
-
     st.markdown("---")
 
     with st.form("login"):
@@ -64,10 +54,8 @@ def mostrar_login():
 
         if ingresar:
             if contrasena == PASSWORD:
-                # Marcamos la sesión como autenticada
                 st.session_state.autenticado = True
                 st.rerun()
-                # st.rerun() recarga la página — ahora muestra el chatbot
             else:
                 st.error("Contraseña incorrecta.")
 
@@ -77,14 +65,17 @@ def mostrar_login():
 @st.cache_resource
 def cargar_sistema():
     """
-    Carga el modelo de embeddings, la base vectorial y arma la cadena RAG.
+    Carga FAISS desde disco — no necesita el PDF original.
     Se ejecuta una sola vez cuando arranca la app.
     """
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    vector_store = Chroma(
-        persist_directory="./chroma_db",
-        embedding_function=embeddings,
+    # FAISS carga los vectores desde los archivos index.faiss e index.pkl
+    # allow_dangerous_deserialization=True es necesario para cargar el .pkl
+    vector_store = FAISS.load_local(
+        "./faiss_db",
+        embeddings,
+        allow_dangerous_deserialization=True
     )
 
     llm = ChatGroq(
@@ -92,8 +83,6 @@ def cargar_sistema():
         temperature=0.2,
     )
 
-    # k=12 — buscamos 12 fragmentos por pregunta
-    # Más fragmentos = mejor cobertura para conceptos distribuidos en el libro
     retriever = vector_store.as_retriever(
         search_kwargs={"k": 12}
     )
@@ -137,12 +126,9 @@ Respuesta:"""
 # ── CHATBOT ────────────────────────────────────────────────────────────────────
 
 def mostrar_chatbot():
-    """Muestra el chatbot una vez que el usuario está autenticado."""
-
     st.markdown('<div class="titulo">📊 Contabilidad Básica</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitulo">Asistente basado en el libro de Simaro y Tonelli.<br>Hacé tu pregunta sobre contabilidad.</div>', unsafe_allow_html=True)
 
-    # Botón para cerrar sesión
     if st.button("Cerrar sesión", type="secondary"):
         st.session_state.autenticado = False
         st.session_state.historial = []
@@ -154,7 +140,6 @@ def mostrar_chatbot():
     if "historial" not in st.session_state:
         st.session_state.historial = []
 
-    # Mostramos el historial
     for item in st.session_state.historial:
         with st.chat_message("user"):
             st.write(item["pregunta"])
@@ -166,7 +151,6 @@ def mostrar_chatbot():
                     unsafe_allow_html=True
                 )
 
-    # Campo de pregunta
     pregunta = st.chat_input("Escribí tu pregunta sobre contabilidad...")
 
     if pregunta:
@@ -203,10 +187,6 @@ def mostrar_chatbot():
 
 
 # ── PUNTO DE ENTRADA ───────────────────────────────────────────────────────────
-#
-# Lógica simple:
-#   - Si no está autenticado → muestra el login
-#   - Si está autenticado → muestra el chatbot
 
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
