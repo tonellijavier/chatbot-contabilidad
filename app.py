@@ -35,7 +35,7 @@ load_dotenv()
 PASSWORD = os.getenv("CHATBOT_PASSWORD")
 
 K = 12       # cuántos fragmentos busca FAISS antes de filtrar
-UMBRAL = 1.0 # distancia máxima aceptada
+UMBRAL = 1.2 # distancia máxima aceptada
              # score bajo = muy similar, score alto = poco similar
              # 1.0 es más permisivo que 0.8 — captura más contexto
              # para preguntas sobre conceptos distribuidos en el libro
