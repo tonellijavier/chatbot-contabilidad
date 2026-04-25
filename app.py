@@ -8,6 +8,13 @@
 # Acceso protegido por contraseña.
 # Usa FAISS como base vectorial — liviano y compatible con Streamlit Cloud.
 #
+# BÚSQUEDA CON FILTRO POR UMBRAL:
+# En lugar de usar RetrievalQA con el retriever estándar, usamos
+# similarity_search_with_score directamente para filtrar fragmentos
+# por distancia euclidiana. Esto garantiza que el modelo solo recibe
+# fragmentos realmente relevantes — igual que en evaluar.py.
+# Así la evaluación y producción usan exactamente la misma lógica.
+#
 # PARA CORRERLO:
 #   streamlit run app.py
 # ==============================================================================
@@ -19,12 +26,48 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_classic.prompts import PromptTemplate
-from langchain_classic.chains import RetrievalQA
+from langchain_core.messages import HumanMessage, SystemMessage
 
 load_dotenv()
 
+# ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
+
 PASSWORD = os.getenv("CHATBOT_PASSWORD")
+
+K = 12       # cuántos fragmentos busca FAISS antes de filtrar
+UMBRAL = 1.0 # distancia máxima aceptada
+             # score bajo = muy similar, score alto = poco similar
+             # 1.0 es más permisivo que 0.8 — captura más contexto
+             # para preguntas sobre conceptos distribuidos en el libro
+
+TEMPLATE = """Sos un asistente especializado en contabilidad que responde
+preguntas basándote en el libro "Contabilidad Básica" de Jorge Simaro y Omar Tonelli.
+
+Contexto del libro:
+{context}
+
+Pregunta: {question}
+
+Instrucciones:
+- Todos los términos deben interpretarse en el contexto de la contabilidad
+- Usá el contexto del libro como base principal para tu respuesta
+- Si el contexto contiene una definición formal del término preguntado,
+  citala antes de explicarla con tus palabras
+- Si la respuesta está explícita en el contexto, explicala con claridad
+- Si no está explícita pero podés deducirla razonando sobre el contexto,
+  hacelo y aclará que es una deducción basada en el libro
+- Si la pregunta involucra comparar conceptos, explicá cada uno por 
+  separado antes de compararlos
+- Si la información genuinamente no está en el contexto, decilo — no inventes
+- Respondé en español, de forma clara y didáctica, como si el lector 
+  fuera un estudiante universitario de primer año
+- Sé conciso — máximo 3 o 4 párrafos
+- Si hay ejemplos numéricos en el contexto, incluilos — son muy útiles
+- Mencioná la página cuando sea útil para que el lector pueda profundizar
+
+    Respuesta:"""
+
+# ── PÁGINA ─────────────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="Contabilidad Básica — Asistente",
@@ -63,64 +106,42 @@ def mostrar_login():
 # ── CARGA DE RECURSOS ──────────────────────────────────────────────────────────
 
 @st.cache_resource
-def cargar_sistema():
+def cargar_recursos():
     """
-    Carga FAISS desde disco — no necesita el PDF original.
-    Se ejecuta una sola vez cuando arranca la app.
+    Carga embeddings, FAISS y LLM — una sola vez cuando arranca la app.
+    @st.cache_resource evita recargar en cada pregunta.
     """
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
-    # FAISS carga los vectores desde los archivos index.faiss e index.pkl
-    # allow_dangerous_deserialization=True es necesario para cargar el .pkl
     vector_store = FAISS.load_local(
         "./faiss_db",
         embeddings,
         allow_dangerous_deserialization=True
     )
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
+    return embeddings, vector_store, llm
 
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-    )
 
-    retriever = vector_store.as_retriever(
-        search_kwargs={"k": 12}
-    )
+# ── BÚSQUEDA CON FILTRO POR UMBRAL ────────────────────────────────────────────
 
-    template = """Sos un asistente especializado en contabilidad que responde
-preguntas basándote en el libro "Contabilidad Básica" de Jorge Simaro y Omar Tonelli.
+def buscar_con_umbral(vector_store, pregunta: str) -> list:
+    """
+    Busca fragmentos relevantes y filtra por umbral de distancia.
 
-Contexto del libro:
-{context}
+    similarity_search_with_score devuelve (documento, score) donde:
+    - score bajo  → fragmento MUY similar a la pregunta
+    - score alto  → fragmento POCO similar
 
-Pregunta: {question}
+    Solo pasan los fragmentos con score < UMBRAL.
+    Si ninguno pasa (umbral muy estricto), devuelve el mejor disponible.
 
-Instrucciones:
-- Usá el contexto del libro como base principal para tu respuesta
-- Si la respuesta está explícita en el contexto, explicala con claridad
-- Si no está explícita pero podés deducirla razonando sobre el contexto,
-  hacelo y aclará que es una deducción basada en el libro
-- Si el tema genuinamente no está en el contexto proporcionado, decilo
-- Respondé en español, de forma clara y didáctica
-- Si hay ejemplos numéricos en el contexto, incluilos — son muy útiles
-- Mencioná la página cuando sea útil para que el lector pueda profundizar
-
-Respuesta:"""
-
-    prompt = PromptTemplate(
-        template=template,
-        input_variables=["context", "question"]
-    )
-
-    cadena = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        chain_type_kwargs={"prompt": prompt},
-        return_source_documents=True,
-    )
-
-    return cadena
+    Esta función es idéntica a la de evaluar.py — garantiza que
+    el chatbot y la evaluación usen exactamente la misma lógica.
+    """
+    docs_con_score = vector_store.similarity_search_with_score(pregunta, k=K)
+    fragmentos = [doc for doc, score in docs_con_score if score < UMBRAL]
+    if not fragmentos:
+        fragmentos = [docs_con_score[0][0]]
+    return fragmentos
 
 
 # ── CHATBOT ────────────────────────────────────────────────────────────────────
@@ -135,7 +156,7 @@ def mostrar_chatbot():
         st.rerun()
 
     with st.spinner("Cargando el sistema..."):
-        cadena = cargar_sistema()
+        _, vector_store, llm = cargar_recursos()
 
     if "historial" not in st.session_state:
         st.session_state.historial = []
@@ -159,15 +180,28 @@ def mostrar_chatbot():
 
         with st.chat_message("assistant"):
             with st.spinner("Buscando en el libro..."):
-                resultado = cadena.invoke({"query": pregunta})
-                respuesta = resultado["result"]
-                fuentes = resultado["source_documents"]
 
-            st.write(respuesta)
+                # Buscamos fragmentos con filtro por umbral
+                fragmentos = buscar_con_umbral(vector_store, pregunta)
 
+                # Armamos el contexto con los fragmentos que pasaron el filtro
+                contexto = "\n\n".join([f.page_content for f in fragmentos])
+
+                # Llamamos al LLM directamente — sin RetrievalQA
+                # Misma lógica que evaluar.py para consistencia
+                prompt_final = TEMPLATE.replace("{context}", contexto).replace("{question}", "")
+                respuesta = llm.invoke([
+                    SystemMessage(content=prompt_final),
+                    HumanMessage(content=pregunta)
+                ])
+                respuesta_texto = respuesta.content
+
+            st.write(respuesta_texto)
+
+            # Páginas consultadas
             paginas = sorted(set(
                 doc.metadata.get("page", 0) + 1
-                for doc in fuentes
+                for doc in fragmentos
                 if doc.metadata.get("page") is not None
             ))
 
@@ -181,7 +215,7 @@ def mostrar_chatbot():
 
         st.session_state.historial.append({
             "pregunta": pregunta,
-            "respuesta": respuesta,
+            "respuesta": respuesta_texto,
             "paginas": paginas_str
         })
 
