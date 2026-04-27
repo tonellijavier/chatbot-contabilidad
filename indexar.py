@@ -46,8 +46,8 @@ if __name__ == "__main__":
 
     print("\nDividiendo en fragmentos...")
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,
-        chunk_overlap=300,
+        chunk_size=800,
+        chunk_overlap=200,
     )
     fragmentos = splitter.split_documents(paginas)
     print(f"   ✓ {len(fragmentos)} fragmentos generados")

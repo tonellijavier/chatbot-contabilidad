@@ -39,7 +39,7 @@ load_dotenv()
 # ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
 
 K = 12
-UMBRAL = 1.0
+UMBRAL = 1.5
 
 # ── PREGUNTAS CON GROUND TRUTH ─────────────────────────────────────────────────
 #
@@ -170,8 +170,8 @@ PREGUNTAS = [
 # Cambiar a "devengado" para el segundo día.
 
 # TEMA_HOY = "variaciones_patrimoniales"
-# TEMA_HOY = "devengado"
-TEMA_HOY = "ejercicio"
+TEMA_HOY = "devengado"
+# TEMA_HOY = "ejercicio"
 # TEMA_HOY = "cuentas corrientes"
 
 
