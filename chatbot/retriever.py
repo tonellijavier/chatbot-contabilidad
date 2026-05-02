@@ -4,13 +4,19 @@
 #
 # Incluye:
 #   - Normalización de preguntas (sinónimos informales, vocabulario universitario)
+#   - Corrección ortográfica automática
 #   - Routing por tipo de pregunta (comparaciones, definiciones, ejemplos)
 #   - Detección de preguntas fuera del dominio
 #   - Búsqueda con filtro por umbral de distancia
+#   - Extracción de contexto conversacional para enriquecer búsqueda
 # ==============================================================================
 
 import unicodedata
+from spellchecker import SpellChecker
 from config import CONFIGURACIONES_ROUTING, K, UMBRAL_DEFAULT
+
+# Instancia global del corrector — se carga una sola vez
+_spell = SpellChecker(language='es')
 
 
 # ── UTILIDADES ─────────────────────────────────────────────────────────────────
@@ -77,8 +83,6 @@ SINONIMOS = {
 }
 
 # ── PALABRAS CLAVE FUERA DEL DOMINIO ──────────────────────────────────────────
-#
-# Palabras que indican que la pregunta claramente no es de contabilidad.
 
 PALABRAS_FUERA_DOMINIO = [
     "futbol", "mundial", "pizza", "cocina", "receta",
@@ -89,9 +93,6 @@ PALABRAS_FUERA_DOMINIO = [
 ]
 
 # ── PALABRAS DE CONTABILIDAD ───────────────────────────────────────────────────
-#
-# Si la pregunta contiene alguna de estas palabras, es del dominio contable.
-# Esta lista tiene prioridad sobre PALABRAS_FUERA_DOMINIO.
 
 PALABRAS_CONTABILIDAD = [
     "activo", "pasivo", "patrimonio", "cuenta", "balance", "asiento",
@@ -103,21 +104,69 @@ PALABRAS_CONTABILIDAD = [
     "imputación", "tracto", "liquidez", "solvencia", "rentabilidad",
 ]
 
+# Palabras técnicas que el corrector no debe modificar
+PALABRAS_PROTEGIDAS = {
+    "resultados", "positivos", "negativos", "patrimonio",
+    "devengado", "permutativa", "modificativa", "contabilidad",
+    "patrimoniales", "acumulados", "propietarios", "corriente",
+    "percepcion", "erogacion",
+}
+
+# ── CORRECCIÓN ORTOGRÁFICA ─────────────────────────────────────────────────────
+
+def corregir_ortografia(pregunta: str) -> str:
+    """
+    Corrige errores de tipeo en la pregunta usando el diccionario español.
+
+    Se aplica DESPUÉS de normalizar sinónimos — así "pn" ya fue reemplazado
+    por "patrimonio neto" antes de que el corrector intente modificarlo.
+
+    Solo corrige palabras de más de 3 letras para evitar falsos positivos
+    con abreviaciones o artículos cortos.
+
+    Si el corrector no está seguro, deja la palabra original.
+    """
+    palabras = pregunta.split()
+    corregidas = []
+    for palabra in palabras:
+        # Limpiamos puntuación para la comparación
+        palabra_limpia = palabra.strip("¿?.,;:!\"'")
+        if len(palabra_limpia) > 3 and palabra_limpia not in PALABRAS_PROTEGIDAS:
+            correccion = _spell.correction(palabra_limpia)
+            # Devolvemos la corrección pero conservamos la puntuación original
+            corregidas.append(correccion if correccion else palabra)
+        else:
+            corregidas.append(palabra)
+    return " ".join(corregidas)
+
 
 # ── NORMALIZACIÓN ──────────────────────────────────────────────────────────────
 
 def normalizar_pregunta(pregunta: str) -> str:
     """
-    Normaliza la pregunta del usuario reemplazando vocabulario informal
-    por términos técnicos del libro.
+    Pipeline de normalización en dos pasos:
 
-    No modifica la pregunta original — trabaja sobre una copia en minúsculas
-    para la búsqueda, pero la interfaz muestra la pregunta original.
+    Paso 1 — Sinónimos informales
+        Reemplaza vocabulario informal argentino por términos técnicos del libro.
+        Ej: "plata" → "patrimonio", "pn" → "patrimonio neto"
+
+    Paso 2 — Corrección ortográfica
+        Corrige errores de tipeo que el diccionario de sinónimos no cubre.
+        Ej: "contabilidadd" → "contabilidad"
+
+    El orden importa: primero sinónimos, después ortografía.
+    Si fuera al revés, el corrector podría "corregir" abreviaciones antes
+    de que el diccionario las reemplace.
     """
+    # Paso 1 — sinónimos informales
     pregunta_normalizada = pregunta.lower()
     for informal, formal in SINONIMOS.items():
         if informal in pregunta_normalizada:
             pregunta_normalizada = pregunta_normalizada.replace(informal, formal)
+
+    # Paso 2 — corrección ortográfica
+    pregunta_normalizada = corregir_ortografia(pregunta_normalizada)
+
     return pregunta_normalizada
 
 
@@ -135,7 +184,6 @@ def es_fuera_del_dominio(pregunta: str) -> bool:
     """
     pregunta_normalizada = sin_tildes(pregunta.lower())
 
-    # Paso 1 — si tiene palabras de contabilidad, es del dominio
     tiene_contabilidad = any(
         sin_tildes(palabra) in pregunta_normalizada
         for palabra in PALABRAS_CONTABILIDAD
@@ -143,7 +191,6 @@ def es_fuera_del_dominio(pregunta: str) -> bool:
     if tiene_contabilidad:
         return False
 
-    # Paso 2 — si tiene palabras claramente fuera del dominio
     tiene_fuera = any(
         sin_tildes(palabra) in pregunta_normalizada
         for palabra in PALABRAS_FUERA_DOMINIO
@@ -151,7 +198,6 @@ def es_fuera_del_dominio(pregunta: str) -> bool:
     if tiene_fuera:
         return True
 
-    # Paso 3 — dudoso → asumimos que es del dominio
     return False
 
 
@@ -160,14 +206,6 @@ def es_fuera_del_dominio(pregunta: str) -> bool:
 def detectar_tipo_pregunta(pregunta: str) -> str:
     """
     Detecta el tipo de pregunta para elegir la configuración óptima de búsqueda.
-
-    Tipos:
-    - comparacion: preguntas que comparan dos conceptos
-    - definicion:  preguntas que piden definir un término
-    - ejemplo:     preguntas que piden ejemplos
-    - lista:       preguntas que piden enumerar conceptos
-    - fuera_dominio: preguntas no relacionadas con contabilidad
-    - general:     cualquier otra pregunta
     """
     pregunta_lower = pregunta.lower()
 
@@ -212,33 +250,25 @@ def obtener_configuracion(tipo: str) -> dict:
 def buscar_fragmentos(vector_store, pregunta: str) -> tuple:
     """
     Pipeline completo de búsqueda:
-    1. Normaliza la pregunta (sinónimos informales)
+    1. Normaliza la pregunta (sinónimos + ortografía)
     2. Detecta el tipo de pregunta (routing)
     3. Elige la configuración óptima de k y umbral
     4. Busca con FAISS y filtra por umbral
 
     Devuelve: (fragmentos, tipo_pregunta, config_usada)
     """
-    # Paso 1 — normalizar
     pregunta_normalizada = normalizar_pregunta(pregunta)
-
-    # Paso 2 — detectar tipo
     tipo = detectar_tipo_pregunta(pregunta_normalizada)
-
-    # Paso 3 — elegir configuración
     config = obtener_configuracion(tipo)
     k = config["k"]
     umbral = config["umbral"]
 
-    # Paso 4 — buscar con FAISS
     docs_con_score = vector_store.similarity_search_with_score(
         pregunta_normalizada, k=k
     )
 
-    # Filtrar por umbral
     fragmentos = [doc for doc, score in docs_con_score if score < umbral]
 
-    # Si ninguno pasó el filtro, devolvemos el mejor disponible
     if not fragmentos:
         fragmentos = [docs_con_score[0][0]]
 
@@ -252,12 +282,6 @@ def extraer_contexto_conversacion(historial: list, max_chars: int = 150) -> str:
     Extrae palabras clave de los últimos 2 turnos del historial
     para enriquecer la búsqueda en FAISS sin costo extra de tokens.
 
-    Ejemplo:
-        Historial: "¿qué es el activo corriente?" → "¿y el pasivo?"
-        Contexto: "activo corriente"
-        Búsqueda enriquecida: "activo corriente ¿y el pasivo?"
-
-    FAISS entiende el contexto y trae fragmentos más relevantes.
     No llama al LLM — es solo concatenación de texto.
     """
     if not historial:

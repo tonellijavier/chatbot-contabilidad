@@ -60,6 +60,10 @@ class TestNormalizacion:
         resultado = normalizar_pregunta("Cuánta PLATA tengo?")
         assert "patrimonio" in resultado
 
+    def test_corrige_error_tipeo(self):
+        resultado = normalizar_pregunta("contabilidadd")
+        assert "contabilidad" in resultado
+
 
 # ── TESTS DE ROUTING ───────────────────────────────────────────────────────────
 
