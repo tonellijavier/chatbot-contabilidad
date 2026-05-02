@@ -5,6 +5,10 @@
 # Mide la calidad de las respuestas del chatbot de contabilidad.
 # Usa preguntas y respuestas provistas por los autores del libro.
 #
+# Importa la lógica de búsqueda desde chatbot/retriever.py y el template
+# desde chatbot/prompts.py — garantizando que evaluación y producción
+# usen exactamente la misma lógica.
+#
 # MÉTRICAS:
 #   - Faithfulness      → ¿la respuesta está basada en los fragmentos encontrados?
 #   - Answer Relevancy  → ¿la respuesta responde realmente la pregunta?
@@ -12,7 +16,7 @@
 #
 # NOTA SOBRE TOKENS:
 #   Cada corrida de 10 preguntas consume ~100.000 tokens (límite diario gratuito de Groq).
-#   Con 19 preguntas totales, corrés el Tema 1 un día y el Tema 2 al día siguiente.
+#   Con 21 preguntas totales, corrés un tema por día.
 #
 # PARA CORRERLO:
 #   python evaluar.py
@@ -34,18 +38,14 @@ from ragas.metrics import Faithfulness, AnswerRelevancy, ContextRecall
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 
+# Importamos la lógica compartida con app.py
+from config import K, UMBRAL_DEFAULT, EMBEDDINGS_MODEL, FAISS_PATH, LLM_MODEL
+from chatbot.retriever import buscar_fragmentos, normalizar_pregunta
+from chatbot.prompts import TEMPLATE_PRINCIPAL, construir_prompt
+
 load_dotenv()
 
-# ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
-
-K = 12
-UMBRAL = 1.5
-
 # ── PREGUNTAS CON GROUND TRUTH ─────────────────────────────────────────────────
-#
-# Dataset provisto por los autores del libro.
-# ground_truth = respuesta esperada correcta — permite medir context_recall.
-# tema = agrupa las preguntas para ver resultados por área del libro.
 
 PREGUNTAS = [
     # ── TEMA 1: Análisis de las Variaciones Patrimoniales ──────────────────────
@@ -145,114 +145,74 @@ PREGUNTAS = [
         "question": "¿Cuál es el criterio para distinguir entre un activo y un resultado negativo?",
         "ground_truth": "La diferencia radica en la capacidad de generar ingresos futuros. Si el hecho tiene capacidad de generar beneficios futuros es un activo; de lo contrario, constituye un resultado negativo.",
         "tema": "devengado"
-
-# ── TEMA 3: Ejercicio ─────────────────────────────────────────────────────
     },
-        {
+
+    # ── TEMA 3: Ejercicio ──────────────────────────────────────────────────────
+    {
         "question": "¿Cuál es el concepto de ejercicio económico en contabilidad?",
-        "ground_truth": "Se entiende por ejercicio económico la división de la vida del ente entre períodos de igual duracion -12 meses- a efectos de suministrar información sobre su situación patrimonial, económica y financiera, y explicar las causas en los cambios en su patrimonio.",
+        "ground_truth": "Se entiende por ejercicio económico la división de la vida del ente entre períodos de igual duración -12 meses- a efectos de suministrar información sobre su situación patrimonial, económica y financiera, y explicar las causas en los cambios en su patrimonio.",
         "tema": "ejercicio"
     },
-    
-# ── TEMA 4: Cuenta corriente ──────────────────────────────────────────────
-        {
+
+    # ── TEMA 4: Cuentas Corrientes ─────────────────────────────────────────────
+    {
         "question": "¿Qué es una cuenta corriente simple o de gestión?",
         "ground_truth": "Son cuentas abiertas por el vendedor a los clientes con la finalidad de otorgarles cierto crédito o plazo para el pago de las ventas o prestaciones de servicios realizadas, que supone habitualidad en la relación comercial y un necesario grado de confianza. Las operaciones mantienen su individualidad debiendo imputarse, por lo tanto, cada pago al respectivo comprobante que originó el crédito. La finalidad de las cuentas simples o de gestión es la registración de las operaciones para acreditar su existencia y facilitar la organización contable.",
-        "tema": "cuentas corrientes"
+        "tema": "cuentas_corrientes"
     },
 ]
 
 # ── SELECTOR DE TEMA ───────────────────────────────────────────────────────────
 #
-# Para no gastar todos los tokens en una sola corrida,
-# evaluás un tema por día.
-#
-# Cambiar a "devengado" para el segundo día.
+# Cambiá TEMA_HOY según el tema a evaluar.
+# Usá el slice para limitar la cantidad de preguntas por corrida
+# y no superar el límite de tokens de Groq.
 
-# TEMA_HOY = "variaciones_patrimoniales"
+TEMA_HOY = "variaciones_patrimoniales"
 # TEMA_HOY = "devengado"
 # TEMA_HOY = "ejercicio"
-TEMA_HOY = "cuentas corrientes"
+# TEMA_HOY = "cuentas_corrientes"
 
-
-# PREGUNTAS_HOY = [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][5:9]
-PREGUNTAS_HOY = [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][-1:]
-
+PREGUNTAS_HOY = [p for p in PREGUNTAS if p["tema"] == TEMA_HOY]
+# Para correr solo algunas preguntas: [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][:5]
 
 
 # ── CARGA DE RECURSOS ──────────────────────────────────────────────────────────
 
 def cargar_recursos():
     print("Cargando recursos...")
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL)
     vector_store = FAISS.load_local(
-        "./faiss_db",
+        FAISS_PATH,
         embeddings,
         allow_dangerous_deserialization=True
     )
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
+    llm = ChatGroq(model=LLM_MODEL, temperature=0.2)
     print("   ✓ Recursos cargados\n")
     return embeddings, vector_store, llm
-
-
-# ── BÚSQUEDA CON FILTRO POR UMBRAL ────────────────────────────────────────────
-
-def buscar_con_umbral(vector_store, pregunta: str, k: int, umbral: float) -> list:
-    """
-    Busca fragmentos relevantes y filtra por umbral de distancia.
-    Score bajo = muy similar. Score alto = poco similar.
-    Solo pasan los fragmentos con score < umbral.
-    """
-    docs_con_score = vector_store.similarity_search_with_score(pregunta, k=k)
-    fragmentos = [doc for doc, score in docs_con_score if score < umbral]
-    if not fragmentos:
-        fragmentos = [docs_con_score[0][0]]
-    return fragmentos
 
 
 # ── GENERACIÓN DE RESPUESTAS ───────────────────────────────────────────────────
 
 def generar_respuestas(vector_store, llm, preguntas: list) -> list:
+    """
+    Genera respuestas usando el mismo pipeline que app.py:
+    normalización → routing → búsqueda con umbral → LLM
+    """
     print(f"Generando respuestas para {len(preguntas)} preguntas...")
-
-    template = """Sos un asistente especializado en contabilidad que responde
-preguntas basándote en el libro "Contabilidad Básica" de Jorge Simaro y Omar Tonelli.
-
-Contexto del libro:
-{context}
-
-Pregunta: {question}
-
-Instrucciones:
-- Todos los términos deben interpretarse en el contexto de la contabilidad
-- Usá el contexto del libro como base principal para tu respuesta
-- Si el contexto contiene una definición formal del término preguntado,
-  citala antes de explicarla con tus palabras
-- Si la respuesta está explícita en el contexto, explicala con claridad
-- Si no está explícita pero podés deducirla razonando sobre el contexto,
-  hacelo y aclará que es una deducción basada en el libro
-- Si la pregunta involucra comparar conceptos, explicá cada uno por 
-  separado antes de compararlos
-- Si la información genuinamente no está en el contexto, decilo — no inventes
-- Respondé en español, de forma clara y didáctica, como si el lector 
-  fuera un estudiante universitario de primer año
-- Sé conciso — máximo 3 o 4 párrafos
-- Si hay ejemplos numéricos en el contexto, incluilos — son muy útiles
-- Mencioná la página cuando sea útil para que el lector pueda profundizar
-
-    Respuesta:"""
-
     resultados = []
 
     for i, item in enumerate(preguntas, 1):
         pregunta = item["question"]
         print(f"   {i}/{len(preguntas)} — {pregunta[:60]}...")
 
-        fragmentos = buscar_con_umbral(vector_store, pregunta, K, UMBRAL)
+        # Mismo pipeline que app.py
+        fragmentos, tipo, config = buscar_fragmentos(vector_store, pregunta)
         contexto = "\n\n".join([f.page_content for f in fragmentos])
+        prompt_final = construir_prompt(TEMPLATE_PRINCIPAL, contexto, pregunta)
 
         respuesta = llm.invoke([
-            SystemMessage(content=template.replace("{context}", contexto).replace("{question}", "")),
+            SystemMessage(content=prompt_final),
             HumanMessage(content=pregunta)
         ])
 
@@ -263,6 +223,8 @@ Instrucciones:
             "ground_truth": item["ground_truth"],
             "tema": item["tema"],
             "fragmentos_usados": len(fragmentos),
+            "tipo_detectado": tipo,
+            "config_usada": config,
         })
 
     print("   ✓ Respuestas generadas\n")
@@ -282,7 +244,7 @@ def evaluar(resultados: list, embeddings) -> object:
     } for r in resultados])
 
     llm_evaluador = LangchainLLMWrapper(
-        ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+        ChatGroq(model=LLM_MODEL, temperature=0)
     )
     embeddings_evaluador = LangchainEmbeddingsWrapper(embeddings)
 
@@ -304,7 +266,6 @@ def mostrar_resultados(evaluacion, resultados: list, tema: str):
     print(f"RESULTADOS — Tema: {tema.replace('_', ' ').title()}")
     print("=" * 70)
 
-    # Promedios globales del tema
     faith  = df["faithfulness"].mean()
     relev  = df["answer_relevancy"].mean()
     recall = df["context_recall"].mean()
@@ -314,7 +275,6 @@ def mostrar_resultados(evaluacion, resultados: list, tema: str):
     print(f"  Answer Relevancy: {relev:.2f}   ← ¿la respuesta responde la pregunta?")
     print(f"  Context Recall:   {recall:.2f}   ← ¿encontró toda la información necesaria?")
 
-    # Detalle por pregunta
     print(f"\nDETALLE POR PREGUNTA:")
     print("-" * 70)
 
@@ -324,10 +284,10 @@ def mostrar_resultados(evaluacion, resultados: list, tema: str):
         c_str = f"{row.context_recall:.2f}" if row.context_recall == row.context_recall else "nan"
 
         print(f"\n{i+1}. {res['question'][:70]}")
+        print(f"   Tipo detectado: {res['tipo_detectado']} | Config: k={res['config_usada']['k']}, umbral={res['config_usada']['umbral']}")
         print(f"   Faithfulness: {f_str}  Relevancy: {r_str}  Recall: {c_str}")
-        print(f"   Fragmentos usados: {res['fragmentos_usados']} de {K} buscados")
+        print(f"   Fragmentos usados: {res['fragmentos_usados']} de {res['config_usada']['k']} buscados")
 
-        # Alertas
         if row.faithfulness == row.faithfulness and row.faithfulness < 0.5:
             print("   ⚠️  Faithfulness baja — posible alucinación")
         if row.context_recall == row.context_recall and row.context_recall < 0.5:
@@ -349,21 +309,22 @@ def guardar_resultados(evaluacion, resultados: list, tema: str):
     datos = {
         "tema": tema,
         "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "configuracion": {"k": K, "umbral": UMBRAL},
         "promedios": {
-            "faithfulness": float(df["faithfulness"].mean()),
+            "faithfulness":     float(df["faithfulness"].mean()),
             "answer_relevancy": float(df["answer_relevancy"].mean()),
-            "context_recall": float(df["context_recall"].mean()),
+            "context_recall":   float(df["context_recall"].mean()),
         },
         "detalle": [
             {
-                "pregunta": r["question"],
-                "ground_truth": r["ground_truth"],
+                "pregunta":          r["question"],
+                "ground_truth":      r["ground_truth"],
                 "respuesta_chatbot": r["answer"],
+                "tipo_detectado":    r["tipo_detectado"],
+                "config_usada":      r["config_usada"],
                 "fragmentos_usados": r["fragmentos_usados"],
-                "faithfulness": float(df.iloc[i]["faithfulness"]) if df.iloc[i]["faithfulness"] == df.iloc[i]["faithfulness"] else None,
-                "answer_relevancy": float(df.iloc[i]["answer_relevancy"]) if df.iloc[i]["answer_relevancy"] == df.iloc[i]["answer_relevancy"] else None,
-                "context_recall": float(df.iloc[i]["context_recall"]) if df.iloc[i]["context_recall"] == df.iloc[i]["context_recall"] else None,
+                "faithfulness":      float(df.iloc[i]["faithfulness"]) if df.iloc[i]["faithfulness"] == df.iloc[i]["faithfulness"] else None,
+                "answer_relevancy":  float(df.iloc[i]["answer_relevancy"]) if df.iloc[i]["answer_relevancy"] == df.iloc[i]["answer_relevancy"] else None,
+                "context_recall":    float(df.iloc[i]["context_recall"]) if df.iloc[i]["context_recall"] == df.iloc[i]["context_recall"] else None,
             }
             for i, r in enumerate(resultados)
         ]
@@ -381,7 +342,7 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 70)
     print(f"EVALUACIÓN RAGAS — Tema: {TEMA_HOY.replace('_', ' ').title()}")
-    print(f"Preguntas: {len(PREGUNTAS_HOY)} | k={K} | umbral={UMBRAL}")
+    print(f"Preguntas: {len(PREGUNTAS_HOY)}")
     print("=" * 70 + "\n")
 
     embeddings, vector_store, llm = cargar_recursos()
