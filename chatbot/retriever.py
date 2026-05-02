@@ -9,7 +9,22 @@
 #   - Búsqueda con filtro por umbral de distancia
 # ==============================================================================
 
+import unicodedata
 from config import CONFIGURACIONES_ROUTING, K, UMBRAL_DEFAULT
+
+
+# ── UTILIDADES ─────────────────────────────────────────────────────────────────
+
+def sin_tildes(texto: str) -> str:
+    """
+    Elimina tildes para comparación robusta.
+    Permite detectar 'fútbol' y 'futbol' con la misma palabra clave.
+    """
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+
 
 # ── SINÓNIMOS Y VOCABULARIO INFORMAL ──────────────────────────────────────────
 #
@@ -63,23 +78,29 @@ SINONIMOS = {
 
 # ── PALABRAS CLAVE FUERA DEL DOMINIO ──────────────────────────────────────────
 #
-# Si la pregunta contiene estas palabras y NO contiene palabras de contabilidad,
-# se considera fuera del dominio.
+# Palabras que indican que la pregunta claramente no es de contabilidad.
 
 PALABRAS_FUERA_DOMINIO = [
-    "fútbol", "futbol", "música", "musica", "película", "pelicula",
-    "cocina", "receta", "clima", "tiempo", "deporte", "política", "politica",
-    "historia", "geografía", "geografia", "física", "fisica", "química", "quimica",
-    "biología", "biologia", "matemática", "matematica", "capital", "país", "pais",
-    "presidente", "gobierno", "partido", "elecciones",
+    "futbol", "mundial", "pizza", "cocina", "receta",
+    "musica", "pelicula", "serie", "netflix",
+    "deporte", "politica", "elecciones", "presidente", "gobierno",
+    "historia", "geografia", "fisica", "quimica", "biologia",
+    "matematica", "clima", "tiempo", "partido",
 ]
+
+# ── PALABRAS DE CONTABILIDAD ───────────────────────────────────────────────────
+#
+# Si la pregunta contiene alguna de estas palabras, es del dominio contable.
+# Esta lista tiene prioridad sobre PALABRAS_FUERA_DOMINIO.
 
 PALABRAS_CONTABILIDAD = [
     "activo", "pasivo", "patrimonio", "cuenta", "balance", "asiento",
-    "debe", "haber", "contabilidad", "ejercicio", "devengado", "variación",
-    "variacion", "resultado", "ingreso", "egreso", "capital", "saldo",
-    "transferencia", "deudor", "acreedor", "inventario", "depreciación",
-    "depreciacion", "amortización", "amortizacion", "costo", "gasto",
+    "debe", "haber", "contabilidad", "ejercicio", "devengado", "variacion",
+    "variación", "resultado", "ingreso", "egreso", "capital", "saldo",
+    "deudor", "acreedor", "inventario", "depreciacion", "depreciación",
+    "amortizacion", "amortización", "costo", "gasto", "permutativa",
+    "modificativa", "hecho sustancial", "hecho generador", "imputacion",
+    "imputación", "tracto", "liquidez", "solvencia", "rentabilidad",
 ]
 
 
@@ -106,15 +127,32 @@ def es_fuera_del_dominio(pregunta: str) -> bool:
     """
     Detecta si la pregunta no tiene relación con contabilidad.
 
-    Lógica: si contiene palabras fuera del dominio Y no contiene
-    palabras de contabilidad, se considera fuera del dominio.
+    Lógica en tres pasos:
+    1. Si tiene palabras de contabilidad → definitivamente es del dominio
+    2. Si tiene palabras claramente fuera del dominio → es fuera
+    3. Si no tiene ni una cosa ni la otra → asumimos que es del dominio
+       (mejor responder "no encontré info" que rechazar la pregunta)
     """
-    pregunta_lower = pregunta.lower()
+    pregunta_normalizada = sin_tildes(pregunta.lower())
 
-    tiene_fuera = any(palabra in pregunta_lower for palabra in PALABRAS_FUERA_DOMINIO)
-    tiene_contabilidad = any(palabra in pregunta_lower for palabra in PALABRAS_CONTABILIDAD)
+    # Paso 1 — si tiene palabras de contabilidad, es del dominio
+    tiene_contabilidad = any(
+        sin_tildes(palabra) in pregunta_normalizada
+        for palabra in PALABRAS_CONTABILIDAD
+    )
+    if tiene_contabilidad:
+        return False
 
-    return tiene_fuera and not tiene_contabilidad
+    # Paso 2 — si tiene palabras claramente fuera del dominio
+    tiene_fuera = any(
+        sin_tildes(palabra) in pregunta_normalizada
+        for palabra in PALABRAS_FUERA_DOMINIO
+    )
+    if tiene_fuera:
+        return True
+
+    # Paso 3 — dudoso → asumimos que es del dominio
+    return False
 
 
 # ── ROUTING POR TIPO DE PREGUNTA ───────────────────────────────────────────────
@@ -138,7 +176,8 @@ def detectar_tipo_pregunta(pregunta: str) -> str:
 
     if any(p in pregunta_lower for p in [
         "diferencia", "diferencia entre", "comparar", "versus", "vs",
-        "distinto", "distinción", "distincion", "igual", "similar"
+        "distinto", "distintos", "distinta", "distintas",
+        "distinción", "distincion", "igual", "similar"
     ]):
         return "comparacion"
 
