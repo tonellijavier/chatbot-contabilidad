@@ -9,7 +9,7 @@
 #   pytest test_chatbot.py -v
 #
 # PARA CORRER UN TEST ESPECÍFICO:
-#   pytest test_chatbot.py::test_normalizar_sinonimo_simple -v
+#   pytest test_chatbot.py::TestMemoria::test_historial_vacio -v
 # ==============================================================================
 
 import pytest
@@ -18,6 +18,7 @@ from chatbot.retriever import (
     detectar_tipo_pregunta,
     es_fuera_del_dominio,
     obtener_configuracion,
+    extraer_contexto_conversacion,
 )
 from chatbot.feedback import detectar_tema
 
@@ -31,38 +32,31 @@ class TestNormalizacion:
     """
 
     def test_sinonimo_plata(self):
-        """'plata' debería normalizarse a 'patrimonio'"""
         resultado = normalizar_pregunta("cuánta plata tengo?")
         assert "patrimonio" in resultado
 
     def test_sinonimo_guita(self):
-        """'guita' debería normalizarse a 'activo'"""
         resultado = normalizar_pregunta("qué es la guita en contabilidad?")
         assert "activo" in resultado
 
     def test_sinonimo_deuda(self):
-        """'deuda' debería normalizarse a 'pasivo'"""
         resultado = normalizar_pregunta("cómo se registra una deuda?")
         assert "pasivo" in resultado
 
     def test_sinonimo_ganancias(self):
-        """'ganancias' debería normalizarse a 'resultados positivos'"""
         resultado = normalizar_pregunta("qué son las ganancias?")
         assert "resultados positivos" in resultado
 
     def test_sinonimo_abreviacion_pn(self):
-        """'pn' debería normalizarse a 'patrimonio neto'"""
         resultado = normalizar_pregunta("cómo calculo el pn?")
         assert "patrimonio neto" in resultado
 
     def test_no_modifica_terminos_correctos(self):
-        """Una pregunta con términos técnicos correctos no debería cambiar significativamente"""
         pregunta = "qué es el activo corriente?"
         resultado = normalizar_pregunta(pregunta)
         assert "activo" in resultado
 
     def test_normaliza_en_minusculas(self):
-        """La normalización trabaja en minúsculas"""
         resultado = normalizar_pregunta("Cuánta PLATA tengo?")
         assert "patrimonio" in resultado
 
@@ -121,8 +115,6 @@ class TestRouting:
 class TestConfiguracion:
     """
     Verifica que cada tipo de pregunta usa la configuración correcta de k y umbral.
-    Las comparaciones necesitan más contexto (k alto).
-    Las definiciones necesitan más precisión (k bajo, umbral bajo).
     """
 
     def test_comparacion_usa_k_alto(self):
@@ -152,7 +144,7 @@ class TestConfiguracion:
 class TestFueraDominio:
     """
     Verifica que el sistema detecta correctamente preguntas que no tienen
-    relación con contabilidad — para evitar que el modelo alucine.
+    relación con contabilidad.
     """
 
     def test_pregunta_sobre_futbol(self):
@@ -205,3 +197,67 @@ class TestDeteccionTema:
     def test_tema_general_para_preguntas_sin_tema(self):
         tema = detectar_tema("¿cómo funciona la contabilidad?")
         assert tema == "general"
+
+
+# ── TESTS DE MEMORIA CONVERSACIONAL ───────────────────────────────────────────
+
+class TestMemoria:
+    """
+    Verifica que el sistema de memoria conversacional funciona correctamente.
+
+    Testea extraer_contexto_conversacion — la función que enriquece
+    la búsqueda en FAISS con palabras clave del historial previo.
+    """
+
+    def test_historial_vacio_devuelve_string_vacio(self):
+        """Sin historial no hay contexto que extraer."""
+        resultado = extraer_contexto_conversacion([])
+        assert resultado == ""
+
+    def test_historial_con_una_pregunta(self):
+        """Con un turno extrae la pregunta como contexto."""
+        historial = [
+            {"pregunta": "¿qué es el activo corriente?", "respuesta": "..."}
+        ]
+        resultado = extraer_contexto_conversacion(historial)
+        assert "activo corriente" in resultado
+
+    def test_historial_con_multiples_preguntas_usa_ultimas_dos(self):
+        """Con varios turnos solo usa los últimos 2."""
+        historial = [
+            {"pregunta": "¿qué es el patrimonio?", "respuesta": "..."},
+            {"pregunta": "¿qué es el activo?", "respuesta": "..."},
+            {"pregunta": "¿qué es el pasivo?", "respuesta": "..."},
+        ]
+        resultado = extraer_contexto_conversacion(historial)
+        # Debe incluir las últimas dos preguntas
+        assert "activo" in resultado
+        assert "pasivo" in resultado
+        # No debe incluir la primera
+        assert "patrimonio" not in resultado
+
+    def test_contexto_respeta_limite_de_caracteres(self):
+        """El contexto no supera max_chars."""
+        historial = [
+            {"pregunta": "x" * 200, "respuesta": "..."},
+            {"pregunta": "y" * 200, "respuesta": "..."},
+        ]
+        resultado = extraer_contexto_conversacion(historial, max_chars=150)
+        assert len(resultado) <= 150
+
+    def test_contexto_por_defecto_150_caracteres(self):
+        """El límite por defecto es 150 caracteres."""
+        historial = [
+            {"pregunta": "a" * 100, "respuesta": "..."},
+            {"pregunta": "b" * 100, "respuesta": "..."},
+        ]
+        resultado = extraer_contexto_conversacion(historial)
+        assert len(resultado) <= 150
+
+    def test_historial_un_turno_devuelve_solo_ese(self):
+        """Con un solo turno devuelve solo esa pregunta."""
+        historial = [
+            {"pregunta": "variaciones patrimoniales", "respuesta": "..."}
+        ]
+        resultado = extraer_contexto_conversacion(historial)
+        assert resultado == "variaciones patrimoniales"
