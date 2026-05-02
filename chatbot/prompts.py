@@ -8,8 +8,6 @@ preguntas basándote en el libro "Contabilidad Básica" de Jorge Simaro y Omar T
 Contexto del libro:
 {context}
 
-Pregunta: {question}
-
 Instrucciones:
 - Todos los términos deben interpretarse en el contexto de la contabilidad
 - Usá el contexto del libro como base principal para tu respuesta
@@ -26,6 +24,8 @@ Instrucciones:
 - Sé conciso — máximo 3 o 4 párrafos
 - Si hay ejemplos numéricos en el contexto, incluilos — son muy útiles
 - Mencioná la página cuando sea útil para que el lector pueda profundizar
+- Si la pregunta parece una continuación de la conversación anterior,
+  interpretala en ese contexto. Si es independiente, respondela por separado.
 
 Respuesta:"""
 
@@ -45,6 +45,10 @@ basadas en el libro de Simaro y Tonelli. No inventes información.
 Respuesta:"""
 
 
-def construir_prompt(template: str, context: str, question: str) -> str:
+def construir_prompt(template: str, context: str, question: str = "") -> str:
     """Construye el prompt reemplazando las variables."""
-    return template.replace("{context}", context).replace("{question}", question)
+    return (
+        template
+        .replace("{context}", context)
+        .replace("{question}", question)
+    )

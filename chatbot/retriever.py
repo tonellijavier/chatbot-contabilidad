@@ -243,3 +243,26 @@ def buscar_fragmentos(vector_store, pregunta: str) -> tuple:
         fragmentos = [docs_con_score[0][0]]
 
     return fragmentos, tipo, config
+
+
+# ── CONTEXTO DE CONVERSACIÓN PARA BÚSQUEDA ────────────────────────────────────
+
+def extraer_contexto_conversacion(historial: list, max_chars: int = 150) -> str:
+    """
+    Extrae palabras clave de los últimos 2 turnos del historial
+    para enriquecer la búsqueda en FAISS sin costo extra de tokens.
+
+    Ejemplo:
+        Historial: "¿qué es el activo corriente?" → "¿y el pasivo?"
+        Contexto: "activo corriente"
+        Búsqueda enriquecida: "activo corriente ¿y el pasivo?"
+
+    FAISS entiende el contexto y trae fragmentos más relevantes.
+    No llama al LLM — es solo concatenación de texto.
+    """
+    if not historial:
+        return ""
+
+    ultimos = historial[-2:]
+    palabras = " ".join([item["pregunta"] for item in ultimos])
+    return palabras[:max_chars]
