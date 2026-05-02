@@ -170,9 +170,9 @@ PREGUNTAS = [
 # Cambiar a "devengado" para el segundo día.
 
 # TEMA_HOY = "variaciones_patrimoniales"
-TEMA_HOY = "devengado"
+# TEMA_HOY = "devengado"
 # TEMA_HOY = "ejercicio"
-# TEMA_HOY = "cuentas corrientes"
+TEMA_HOY = "cuentas corrientes"
 
 
 # PREGUNTAS_HOY = [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][5:9]
