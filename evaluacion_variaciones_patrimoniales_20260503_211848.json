@@ -1,0 +1,147 @@
+{
+  "tema": "variaciones_patrimoniales",
+  "fecha": "2026-05-03 21:18:48",
+  "promedios": {
+    "faithfulness": NaN,
+    "answer_relevancy": 0.7217804376637592,
+    "context_recall": NaN,
+    "context_precision": NaN
+  },
+  "detalle": [
+    {
+      "pregunta": "¿Cuál es la importancia de estudiar las variaciones patrimoniales dentro del sistema contable?",
+      "ground_truth": "Es un paso previo fundamental para comprender el funcionamiento del sistema contable. Permite identificar cómo cada operación afecta la estructura y el valor del ente.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, el estudio de las variaciones patrimoniales es fundamental dentro del sistema contable. En la página 136, se menciona que \"el análisis en profundidad de los cambios que se producen en el patrimonio de un ente\" es de suma importancia como paso previo al análisis del funcionamiento del sistema contable.\n\nLa importancia de estudiar las variaciones patrimoniales radica en que permite entender cómo se modifican los elementos patrimoniales, como el activo, el pasivo y el patrimonio neto, y cómo se afecta la cuantía del patrimonio neto. Esto es crucial para tomar decisiones informadas y para evaluar la situación financiera de una empresa. Además, el estudio de las variaciones patrimoniales permite identificar los cambios producidos en el patrimonio neto originados en aportes de los socios, reducciones de capital, retiros de utilidades acumuladas y hechos y operaciones que afectan el patrimonio neto.\n\nEn resumen, el estudio de las variaciones patrimoniales es esencial para comprender el funcionamiento del sistema contable y para evaluar la situación financiera de una empresa. Esto se refleja en la clasificación de las variaciones patrimoniales en permutativas, modificativas de capital y modificativas de resultados acumulados, que se presenta en el libro como una herramienta para analizar y entender los cambios en el patrimonio de una empresa.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.7298661133130269,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Cómo se definen las variaciones patrimoniales permutativas?",
+      "ground_truth": "Son cambios que modifican los elementos patrimoniales — activo, pasivo o patrimonio neto — pero no afectan el valor numérico final del patrimonio neto.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, en la página 136, las variaciones patrimoniales permutativas se definen como: \"aquellas que sin alterar la cuantía del Patrimonio Neto modifican los elementos patrimoniales (Activo, Pasivo) o la composición del Patrimonio Neto\". En otras palabras, son cambios que ocurren dentro del patrimonio de una empresa, pero que no afectan el monto total del patrimonio neto. Por ejemplo, la compra de mercaderías por $100 es una variación patrimonial permutativa, ya que no cambia la cuantía del patrimonio neto, pero sí modifica la composición del activo.\n\nEsto significa que las variaciones patrimoniales permutativas son movimientos dentro del patrimonio que no aumentan ni disminuyen el patrimonio neto, sino que simplemente lo reorganizan. Es importante destacar que estas variaciones se registran en el libro diario y se utilizan cuentas regularizadoras para igualar la ecuación contable. \n\nEn resumen, las variaciones patrimoniales permutativas son cambios que ocurren dentro del patrimonio de una empresa, sin afectar el monto total del patrimonio neto, y se registran en el libro diario para mantener el equilibrio patrimonial.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.9303533670747187,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Qué distingue fundamentalmente a una variación modificativa de una permutativa?",
+      "ground_truth": "La diferencia radica en la alteración de la cuantía del patrimonio neto. Las permutativas mantienen el valor total inalterado, las modificativas alteran los elementos patrimoniales y modifican efectivamente el importe total del patrimonio neto.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, una variación patrimonial puede ser permutativa o modificativa. La principal diferencia entre ambas radica en su naturaleza y efecto en el patrimonio.\n\nUna variación patrimonial permutativa se refiere a un cambio en la composición del patrimonio, donde un elemento patrimonial se reemplaza por otro. Por ejemplo, la compra de un activo a cambio de dinero (página 100). En este caso, el patrimonio sigue siendo el mismo, pero su composición cambia.\n\nPor otro lado, una variación patrimonial modificativa se refiere a un cambio en el valor o cantidad de un elemento patrimonial, sin que haya un intercambio con otro elemento. Esto puede deberse a hechos como la depreciación de un activo, el aumento del capital social o la generación de resultados (página 137). En este caso, el patrimonio neto cambia debido a la variación en el valor o cantidad de un elemento patrimonial.\n\nEn resumen, lo que distingue fundamentalmente a una variación modificativa de una permutativa es que la primera implica un cambio en el valor o cantidad de un elemento patrimonial, mientras que la segunda implica un intercambio entre elementos patrimoniales.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.808541355817107,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Qué hechos originan una variación patrimonial modificativa de capital?",
+      "ground_truth": "Se originan por aportes realizados por los socios o por reducciones voluntarias del capital. Son cambios vinculados directamente a la voluntad y acción de los propietarios sobre el capital social.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, las variaciones patrimoniales modificativas de capital se producen por cambios en el Patrimonio Neto originados en aportes de los socios o reducciones voluntarias de capital (página 136). Estos cambios pueden ser producidos por la suscripción de los socios y aporte en efectivo de capital, o por la decisión de los propietarios de reducir voluntariamente el capital que se pagará a los socios.\n\nEn otras palabras, las variaciones patrimoniales modificativas de capital se originan por dos tipos de hechos: \n\n1. Aportes de los socios: cuando los socios aportan dinero o activos al ente, aumentando el Patrimonio Neto.\n2. Reducciones voluntarias de capital: cuando los propietarios deciden reducir el capital del ente, disminuyendo el Patrimonio Neto.\n\nEstos hechos modifican la cuantía del Patrimonio Neto y, por lo tanto, se consideran variaciones patrimoniales modificativas de capital.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.8719766384931061,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Cómo se clasifican las variaciones modificativas de resultados acumulados?",
+      "ground_truth": "Se dividen en dos categorías: retiros de los propietarios (dividendos) y variaciones originadas por hechos y operaciones, que pueden ser de resultados positivos o negativos.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, las variaciones modificativas de resultados acumulados se clasifican en dos categorías: Resultados Positivos y Resultados Negativos. \n\nLos Resultados Positivos se producen como consecuencia de hechos y operaciones que generan variaciones patrimoniales modificativas, tales como la comercialización, administración, financiación, etc. Por otro lado, los Resultados Negativos se producen cuando existen hechos o actos que disminuyen el patrimonio, como los gastos incurridos para producir resultados positivos.\n\nEn cuanto a la imputación de resultados negativos a períodos, se aplican los siguientes criterios: 1) Vinculados directamente con Resultados positivos, y 2) si no hay vinculación directa, se imputan según el criterio de tiempo. Es decir, se imputarán los resultados negativos como correspondientes a ese ejercicio. Si no resulta factible establecer vinculación directa con ingresos o con el período, deberá reconocérselo en el ejercicio en que se conozca. \n\nEn la página 137 del libro, se menciona que las variaciones patrimoniales se clasifican en: Variaciones Permutativas, Variaciones Modificativas de Capital y Variaciones Modificativas de Resultados. Las Variaciones Modificativas de Resultados se dividen en Resultados Positivos y Resultados Negativos.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.7639428415701869,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿En qué consiste una variación por retiros de los propietarios?",
+      "ground_truth": "Son disminuciones del patrimonio neto originadas en la decisión de los socios de retirar utilidades acumuladas previamente. No deben confundirse con reducciones de capital.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, no se encuentra una definición explícita de \"variación por retiros de los propietarios\" en el contexto proporcionado. Sin embargo, se menciona que los saldos de las cuentas particulares de los socios, directores, gerentes, etc. representan los montos anticipados a los socios, directores, gerentes, etc. a cuenta de futuras utilidades (página 92).\n\nUna deducción basada en el contexto es que una variación por retiros de los propietarios podría referirse a los cambios en la cuenta de los propietarios debido a la extracción de fondos o activos por parte de los propietarios de la organización. Esto podría incluir retiros de efectivo, bienes o servicios por parte de los propietarios, lo que afectaría el patrimonio neto de la organización.\n\nEs importante destacar que la información proporcionada no es suficiente para proporcionar una respuesta definitiva y clara sobre el concepto de variación por retiros de los propietarios. Si se busca una respuesta más precisa, sería necesario consultar otras fuentes o buscar más información en el libro.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.0,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Qué caracteriza a las variaciones modificativas de resultados positivos?",
+      "ground_truth": "Son aumentos producidos en el patrimonio neto que no tienen su origen en aportes de los socios. Son incrementos generados por la propia actividad o hechos económicos del ente.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, las variaciones modificativas de resultados positivos se caracterizan por ser reconocidas cuando son \"realizados\", es decir, cuando el hecho sustancial se verifica y la operación queda perfeccionada desde el punto de vista legal o de las prácticas comerciales vigentes, habiendo ponderado los riesgos inherentes a la operación (página 148).\n\nEn palabras de Enrique Fowler Newton, \"el ingreso debe ser razonablemente definitivo, en el sentido de que no exista posibilidad de que la situación pudiera retrotraerse a aquella anterior al hecho\" (página 148). Esto significa que los resultados positivos deben ser reconocidos cuando estén libres de riesgos y sean definitivos.\n\nAdemás, el modelo contable que se utiliza exige que los resultados positivos sean reconocidos al final de cada período, teniendo en cuenta la proporcionalidad atribuible al mismo. Por ejemplo, intereses de plazo fijo, alquileres de un local tenido para renta, regalías por franquicias, dividendos, etc. (página 148). También se incluyen otros hechos o actos que incrementen el patrimonio, como donaciones o subsidios estatales, que se imputan al período en que se toma conocimiento de la variación patrimonial producida.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": null,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Qué diferencia existe entre un resultado negativo y una reducción voluntaria de capital?",
+      "ground_truth": "Ambos disminuyen el patrimonio neto, pero los resultados negativos provienen de la operación o hechos económicos, mientras que las reducciones de capital son actos voluntarios de los socios sobre sus aportes originales.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, un resultado negativo y una reducción voluntaria de capital son dos conceptos diferentes en contabilidad.\n\nUn resultado negativo se refiere a una pérdida o déficit que una empresa experimenta durante un período determinado. Esto puede ocurrir cuando los gastos y costos de la empresa superan a sus ingresos y ganancias. En este caso, el resultado negativo se refleja en la cuenta \"Resultados no asignados\" y puede ser absorbido por la empresa mediante la reducción de su capital social (página 480).\n\nPor otro lado, una reducción voluntaria de capital se refiere a la decisión de los socios o propietarios de una empresa de disminuir el capital social de la empresa. Esto puede ocurrir por varias razones, como la absorción de pérdidas, la devolución de capital a los socios o la reestructuración de la empresa. En este caso, la reducción de capital se refleja en la cuenta \"Capital social\" y se debe debitar la cuenta representativa del capital y acreditar la cuenta \"Resultados no asignados\" (página 40.000).\n\nEn resumen, la principal diferencia entre un resultado negativo y una reducción voluntaria de capital es que el primero se refiere a una pérdida o déficit que la empresa experimenta, mientras que el segundo se refiere a una decisión deliberada de los socios o propietarios de disminuir el capital social de la empresa. Ambos conceptos pueden estar relacionados, ya que una reducción de capital puede ser utilizada para absorber pérdidas, pero son conceptos distintos en contabilidad.",
+      "tipo_detectado": "comparacion",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": 0.9477827473781681,
+      "context_recall": null,
+      "context_precision": null
+    },
+    {
+      "pregunta": "¿Qué elementos del patrimonio pueden verse alterados en una variación permutativa?",
+      "ground_truth": "Se modifican los elementos del activo o del pasivo, o cambia la composición del patrimonio neto, siempre manteniendo el equilibrio del valor total sin alterar la cuantía del patrimonio neto.",
+      "respuesta_chatbot": "Según el libro \"Contabilidad Básica\" de Jorge Simaro y Omar Tonelli, en una variación patrimonial permutativa, se modifican los elementos patrimoniales (Activo, Pasivo) o la composición del Patrimonio Neto, sin alterar la cuantía del Patrimonio Neto. \n\nEn otras palabras, en una variación permutativa, pueden verse alterados los siguientes elementos del patrimonio: \n- El Activo: puede aumentar o disminuir en alguna de sus cuentas, como por ejemplo, una compra de mercaderías que aumenta el Activo en cuentas de mercaderías, pero disminuye el Activo en cuentas de caja o bancos.\n- El Pasivo: puede aumentar o disminuir en alguna de sus cuentas, como por ejemplo, una compra a crédito que aumenta el Pasivo en cuentas de proveedores, pero aumenta el Activo en cuentas de mercaderías.\n- La composición del Patrimonio Neto: puede cambiar la distribución de los componentes del Patrimonio Neto, como por ejemplo, un aumento en el capital social debido a una aportación de los socios, pero sin alterar la cuantía total del Patrimonio Neto.\n\nUn ejemplo de variación permutativa es una compra de mercaderías por $100, que es una variación patrimonial permutativa, ya que no altera la cuantía del Patrimonio Neto, pero sí modifica los elementos patrimoniales (Activo y Pasivo). \n\nEs importante destacar que, como se menciona en el libro, en la página 136, las variaciones patrimoniales permutativas no alteran la cuantía del Patrimonio Neto, pero sí modifican los elementos patrimoniales.",
+      "tipo_detectado": "general",
+      "config_usada": {
+        "k": 12,
+        "umbral": 1.5
+      },
+      "fragmentos_usados": 12,
+      "faithfulness": null,
+      "answer_relevancy": null,
+      "context_recall": null,
+      "context_precision": null
+    }
+  ]
+}

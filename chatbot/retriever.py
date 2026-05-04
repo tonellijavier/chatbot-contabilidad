@@ -12,11 +12,7 @@
 # ==============================================================================
 
 import unicodedata
-from spellchecker import SpellChecker
 from config import CONFIGURACIONES_ROUTING, K, UMBRAL_DEFAULT
-
-# Instancia global del corrector — se carga una sola vez
-_spell = SpellChecker(language='es')
 
 
 # ── UTILIDADES ─────────────────────────────────────────────────────────────────
@@ -104,69 +100,20 @@ PALABRAS_CONTABILIDAD = [
     "imputación", "tracto", "liquidez", "solvencia", "rentabilidad",
 ]
 
-# Palabras técnicas que el corrector no debe modificar
-PALABRAS_PROTEGIDAS = {
-    "resultados", "positivos", "negativos", "patrimonio",
-    "devengado", "permutativa", "modificativa", "contabilidad",
-    "patrimoniales", "acumulados", "propietarios", "corriente",
-    "percepcion", "erogacion",
-}
-
-# ── CORRECCIÓN ORTOGRÁFICA ─────────────────────────────────────────────────────
-
-def corregir_ortografia(pregunta: str) -> str:
-    """
-    Corrige errores de tipeo en la pregunta usando el diccionario español.
-
-    Se aplica DESPUÉS de normalizar sinónimos — así "pn" ya fue reemplazado
-    por "patrimonio neto" antes de que el corrector intente modificarlo.
-
-    Solo corrige palabras de más de 3 letras para evitar falsos positivos
-    con abreviaciones o artículos cortos.
-
-    Si el corrector no está seguro, deja la palabra original.
-    """
-    palabras = pregunta.split()
-    corregidas = []
-    for palabra in palabras:
-        # Limpiamos puntuación para la comparación
-        palabra_limpia = palabra.strip("¿?.,;:!\"'")
-        if len(palabra_limpia) > 3 and palabra_limpia not in PALABRAS_PROTEGIDAS:
-            correccion = _spell.correction(palabra_limpia)
-            # Devolvemos la corrección pero conservamos la puntuación original
-            corregidas.append(correccion if correccion else palabra)
-        else:
-            corregidas.append(palabra)
-    return " ".join(corregidas)
-
-
 # ── NORMALIZACIÓN ──────────────────────────────────────────────────────────────
 
 def normalizar_pregunta(pregunta: str) -> str:
     """
-    Pipeline de normalización en dos pasos:
+    Normaliza la pregunta del usuario reemplazando vocabulario informal
+    por términos técnicos del libro.
 
-    Paso 1 — Sinónimos informales
-        Reemplaza vocabulario informal argentino por términos técnicos del libro.
-        Ej: "plata" → "patrimonio", "pn" → "patrimonio neto"
-
-    Paso 2 — Corrección ortográfica
-        Corrige errores de tipeo que el diccionario de sinónimos no cubre.
-        Ej: "contabilidadd" → "contabilidad"
-
-    El orden importa: primero sinónimos, después ortografía.
-    Si fuera al revés, el corrector podría "corregir" abreviaciones antes
-    de que el diccionario las reemplace.
+    Reemplaza vocabulario informal argentino por términos técnicos del libro.
+    Ej: "plata" → "patrimonio", "pn" → "patrimonio neto"
     """
-    # Paso 1 — sinónimos informales
     pregunta_normalizada = pregunta.lower()
     for informal, formal in SINONIMOS.items():
         if informal in pregunta_normalizada:
             pregunta_normalizada = pregunta_normalizada.replace(informal, formal)
-
-    # Paso 2 — corrección ortográfica
-    pregunta_normalizada = corregir_ortografia(pregunta_normalizada)
-
     return pregunta_normalizada
 
 

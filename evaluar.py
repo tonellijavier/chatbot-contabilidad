@@ -10,9 +10,10 @@
 # usen exactamente la misma lógica.
 #
 # MÉTRICAS:
-#   - Faithfulness      → ¿la respuesta está basada en los fragmentos encontrados?
-#   - Answer Relevancy  → ¿la respuesta responde realmente la pregunta?
-#   - Context Recall    → ¿encontró toda la información necesaria? (requiere ground_truth)
+#   - Faithfulness       → ¿la respuesta está basada en los fragmentos encontrados?
+#   - Answer Relevancy   → ¿la respuesta responde realmente la pregunta?
+#   - Context Recall     → ¿encontró toda la información necesaria? (requiere ground_truth)
+#   - Context Precision  → ¿los fragmentos encontrados eran relevantes? (requiere ground_truth)
 #
 # NOTA SOBRE TOKENS:
 #   Cada corrida de 10 preguntas consume ~100.000 tokens (límite diario gratuito de Groq).
@@ -34,7 +35,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from datasets import Dataset
 from ragas import evaluate
-from ragas.metrics import Faithfulness, AnswerRelevancy, ContextRecall
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextRecall, ContextPrecision
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 
@@ -163,10 +164,6 @@ PREGUNTAS = [
 ]
 
 # ── SELECTOR DE TEMA ───────────────────────────────────────────────────────────
-#
-# Cambiá TEMA_HOY según el tema a evaluar.
-# Usá el slice para limitar la cantidad de preguntas por corrida
-# y no superar el límite de tokens de Groq.
 
 TEMA_HOY = "variaciones_patrimoniales"
 # TEMA_HOY = "devengado"
@@ -174,7 +171,7 @@ TEMA_HOY = "variaciones_patrimoniales"
 # TEMA_HOY = "cuentas_corrientes"
 
 PREGUNTAS_HOY = [p for p in PREGUNTAS if p["tema"] == TEMA_HOY]
-# Para correr solo algunas preguntas: [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][:5]
+# Para correr solo algunas: [p for p in PREGUNTAS if p["tema"] == TEMA_HOY][:5]
 
 
 # ── CARGA DE RECURSOS ──────────────────────────────────────────────────────────
@@ -206,7 +203,6 @@ def generar_respuestas(vector_store, llm, preguntas: list) -> list:
         pregunta = item["question"]
         print(f"   {i}/{len(preguntas)} — {pregunta[:60]}...")
 
-        # Mismo pipeline que app.py
         fragmentos, tipo, config = buscar_fragmentos(vector_store, pregunta)
         contexto = "\n\n".join([f.page_content for f in fragmentos])
         prompt_final = construir_prompt(TEMPLATE_PRINCIPAL, contexto, pregunta)
@@ -250,7 +246,7 @@ def evaluar(resultados: list, embeddings) -> object:
 
     return evaluate(
         dataset=dataset,
-        metrics=[Faithfulness(), AnswerRelevancy(), ContextRecall()],
+        metrics=[Faithfulness(), AnswerRelevancy(), ContextRecall(), ContextPrecision()],
         llm=llm_evaluador,
         embeddings=embeddings_evaluador,
         raise_exceptions=False,
@@ -266,32 +262,37 @@ def mostrar_resultados(evaluacion, resultados: list, tema: str):
     print(f"RESULTADOS — Tema: {tema.replace('_', ' ').title()}")
     print("=" * 70)
 
-    faith  = df["faithfulness"].mean()
-    relev  = df["answer_relevancy"].mean()
-    recall = df["context_recall"].mean()
+    faith     = df["faithfulness"].mean()
+    relev     = df["answer_relevancy"].mean()
+    recall    = df["context_recall"].mean()
+    precision = df["context_precision"].mean()
 
     print(f"\nPROMEDIOS DEL TEMA:")
-    print(f"  Faithfulness:     {faith:.2f}   ← ¿la respuesta está basada en los fragmentos?")
-    print(f"  Answer Relevancy: {relev:.2f}   ← ¿la respuesta responde la pregunta?")
-    print(f"  Context Recall:   {recall:.2f}   ← ¿encontró toda la información necesaria?")
+    print(f"  Faithfulness:      {faith:.2f}   ← ¿la respuesta está basada en los fragmentos?")
+    print(f"  Answer Relevancy:  {relev:.2f}   ← ¿la respuesta responde la pregunta?")
+    print(f"  Context Recall:    {recall:.2f}   ← ¿encontró toda la información necesaria?")
+    print(f"  Context Precision: {precision:.2f}   ← ¿los fragmentos encontrados eran relevantes?")
 
     print(f"\nDETALLE POR PREGUNTA:")
     print("-" * 70)
 
     for i, (row, res) in enumerate(zip(df.itertuples(), resultados)):
-        f_str = f"{row.faithfulness:.2f}" if row.faithfulness == row.faithfulness else "nan"
-        r_str = f"{row.answer_relevancy:.2f}" if row.answer_relevancy == row.answer_relevancy else "nan"
-        c_str = f"{row.context_recall:.2f}" if row.context_recall == row.context_recall else "nan"
+        f_str = f"{row.faithfulness:.2f}"      if row.faithfulness      == row.faithfulness      else "nan"
+        r_str = f"{row.answer_relevancy:.2f}"  if row.answer_relevancy  == row.answer_relevancy  else "nan"
+        c_str = f"{row.context_recall:.2f}"    if row.context_recall    == row.context_recall    else "nan"
+        p_str = f"{row.context_precision:.2f}" if row.context_precision == row.context_precision else "nan"
 
         print(f"\n{i+1}. {res['question'][:70]}")
-        print(f"   Tipo detectado: {res['tipo_detectado']} | Config: k={res['config_usada']['k']}, umbral={res['config_usada']['umbral']}")
-        print(f"   Faithfulness: {f_str}  Relevancy: {r_str}  Recall: {c_str}")
+        print(f"   Tipo: {res['tipo_detectado']} | k={res['config_usada']['k']}, umbral={res['config_usada']['umbral']}")
+        print(f"   Faithfulness: {f_str}  Relevancy: {r_str}  Recall: {c_str}  Precision: {p_str}")
         print(f"   Fragmentos usados: {res['fragmentos_usados']} de {res['config_usada']['k']} buscados")
 
         if row.faithfulness == row.faithfulness and row.faithfulness < 0.5:
             print("   ⚠️  Faithfulness baja — posible alucinación")
         if row.context_recall == row.context_recall and row.context_recall < 0.5:
             print("   ⚠️  Context Recall bajo — el retriever no encontró suficiente información")
+        if row.context_precision == row.context_precision and row.context_precision < 0.5:
+            print("   ⚠️  Context Precision baja — muchos fragmentos irrelevantes")
 
     print("\nINTERPRETACIÓN:")
     print("  > 0.8 → excelente | 0.6-0.8 → aceptable | < 0.6 → necesita mejoras")
@@ -310,9 +311,10 @@ def guardar_resultados(evaluacion, resultados: list, tema: str):
         "tema": tema,
         "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "promedios": {
-            "faithfulness":     float(df["faithfulness"].mean()),
-            "answer_relevancy": float(df["answer_relevancy"].mean()),
-            "context_recall":   float(df["context_recall"].mean()),
+            "faithfulness":      float(df["faithfulness"].mean()),
+            "answer_relevancy":  float(df["answer_relevancy"].mean()),
+            "context_recall":    float(df["context_recall"].mean()),
+            "context_precision": float(df["context_precision"].mean()),
         },
         "detalle": [
             {
@@ -322,9 +324,10 @@ def guardar_resultados(evaluacion, resultados: list, tema: str):
                 "tipo_detectado":    r["tipo_detectado"],
                 "config_usada":      r["config_usada"],
                 "fragmentos_usados": r["fragmentos_usados"],
-                "faithfulness":      float(df.iloc[i]["faithfulness"]) if df.iloc[i]["faithfulness"] == df.iloc[i]["faithfulness"] else None,
-                "answer_relevancy":  float(df.iloc[i]["answer_relevancy"]) if df.iloc[i]["answer_relevancy"] == df.iloc[i]["answer_relevancy"] else None,
-                "context_recall":    float(df.iloc[i]["context_recall"]) if df.iloc[i]["context_recall"] == df.iloc[i]["context_recall"] else None,
+                "faithfulness":      float(df.iloc[i]["faithfulness"])      if df.iloc[i]["faithfulness"]      == df.iloc[i]["faithfulness"]      else None,
+                "answer_relevancy":  float(df.iloc[i]["answer_relevancy"])  if df.iloc[i]["answer_relevancy"]  == df.iloc[i]["answer_relevancy"]  else None,
+                "context_recall":    float(df.iloc[i]["context_recall"])    if df.iloc[i]["context_recall"]    == df.iloc[i]["context_recall"]    else None,
+                "context_precision": float(df.iloc[i]["context_precision"]) if df.iloc[i]["context_precision"] == df.iloc[i]["context_precision"] else None,
             }
             for i, r in enumerate(resultados)
         ]
